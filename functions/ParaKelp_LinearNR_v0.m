@@ -1,0 +1,133 @@
+function kelp = ParaKelp_LinearNR_v0(tmax)
+
+% Sets para values for kelp portion of the model.
+% Relevant to PredUrchinKelp_LinearNR_v1.m & PredUrchinKelp_LinearNR_v2.m
+
+% Code sets up a table, with a row for each species
+% Where NaN exists, the parameter is either irrlevant for that species, or
+% its hasn't been parameterised yet 
+
+% Para values follow this order
+    Species = {'Giant_kelp'; 'Bull_kelp'}; % <-if running for BK check latest values
+
+% Recruitment
+    % juvenile (spore) retention/connectivity [0,1] 
+    % this is only used in nearest neighbour and well-mixed dispersal
+    % low = more connectivity between patches
+    % high = less connectivity (more kelp locally)
+    rJ = [0.95; NaN]; % 1; % 
+
+    % yearly incomming settlers per kg adult standing kelp
+    % (zoospore production and successful fertilization and settlement of spore)
+    % mean value
+    RK = [4*10^4; 4.97*10^4]; % 
+
+    % temporal & spatial stdev (noise)
+    % normalised 
+    RKstdv = [0.389; 0.389];%  [0; 0]; %    
+
+    % **strength of denisity dependence (controls the overall equilibrium values)
+    % smaller = weaker effect = higher avg equilibrium numbers
+    mu = [0.4*10^-5; 1*10^-4];   % 1*10^-5;
+
+        % the relative per capita effect on juvenile survival by adults and juveniles
+        % ddD = 0 for ricker (inter-cohort DD, adults->juvs)
+        % ddD = 1 for beverton-holt (intra-cohort DD, juvs <->)
+        % we'll assume that one adult has the same effect as one juvenile on the survival for giant kelp
+        ddD = [0.01; 1]; % 0.5; % 
+
+        % spatial variance in kelp densitites 
+        % (for use in scale transition to landscape)
+        % value from PISCO_kelp-urchin-sheephead_data.Rmd
+        muvar = [189090; 189090]; %
+
+    % Recruitment timing
+    % vector that decitates if, and how much, recrtuiment occurs in that time step
+    % summer & autum peaks for giant kelp
+    % spring peaks for bull kelp
+    RTk = repmat([0.1 0.1 0.4 0.4;
+                  0   1   0   0],1,tmax/4); %
+    % RTk = repmat([0.25 0.25 0.25 0.25;...
+                  % 0.25 0.25 0.25 0.25],1,tmax/4); %
+        
+        % recruitment lag
+        % Giant kelp (no lag)
+        % Bull kelp (vector of lags, 2 and 3 time-steps before spring)
+        lag = [0 0; 
+               2 3];  
+        
+        % reproduction weightings
+        reproWeight = [0.5 0.5;   % Giant kelp
+                       0.9 0.1];  % Bull kelp
+                        % 1 .11
+            
+    
+% Growth/Maturation    
+    % growth rate season to season
+    g = [6.825; 76.44]; % 
+
+% Mortality/survival
+    % change in standing kelp biomass over the seasons
+    % [winter spring summer autum]
+    lambda = repmat([1 1 0.8 0.9;...
+                     0 1 0.8 0.6],1,tmax/4); % 
+ 
+    % standing (juvenile + adult) kelp retension
+    rS = [0.5688; 0.5688]; % 0.83; %      
+
+    % drift production [0,1]
+    % (standing kelp mortality)
+    % low = more kelp, high = more drift
+    c = [0.9; 0.9]; % 
+
+    % drift retention [0,1]
+    % proprotion that stays within the source patch 
+    % (rest goes to nearest neighbour)
+    % low = less retained, high = more retained
+    % note this is called d in the paper
+    rD = [0.7; 0.8]; % 0.9
+
+    % drift decomposition + other loss (e.g., loss outside of popualtion) [0,1]
+    % low = slower decomp, high = fast decomp
+    % note this is called rD (the non-decmposition) value in the paper 
+    d = [0.8; 0.8]; % 0.9;% 0.2; % 
+
+% Grazing
+    % attack rates (of urchin stage j on kelp stage i)
+    % (p.c. grazing mortality in absence of conspecifics)
+    aij = [{[ 0  0.5;
+              0  0.5;
+              1  0 ]};...
+           {[ 0  0.5;
+              0  0.5;
+              1  0 ]}];
+
+    % max prey consumed (1/handling time) 
+    % (of urchin stage j on kelp stage i)    
+    bhij = [{[ 0  2.985;  
+               0  2.985;
+               2.985  0 ]};...
+            {[ 0  2.985;  
+               0  2.985;
+               2.985  0 ]}];
+
+        % including seasonal variation
+        % [winter spring summer autum]
+        scalingFactor = reshape([1 0.9 1.15 1.2], 1, 1, 4);
+        
+        hij = cell(size(bhij));  % preallocate cell array of same size
+       
+        for i = 1:numel(bhij)
+            hij{i} = repmat(bhij{i} .* scalingFactor, 1, 1, tmax/4);
+        end
+
+
+% kelp species table and choice ----------
+
+% join in table
+    Paratable = table(rJ, RK, RKstdv, mu, ddD, muvar, RTk, lag, reproWeight, g, lambda, rS, c, rD, d, aij, bhij, hij,'RowNames', Species);
+
+% select species
+    kelp = Paratable('Giant_kelp',:);
+
+end
